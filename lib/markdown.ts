@@ -1,5 +1,5 @@
 import { marked } from "marked";
-import DOMPurify from "isomorphic-dompurify";
+import sanitizeHtml from "sanitize-html";
 
 export async function parseMarkdown(markdown: string): Promise<string> {
   marked.setOptions({
@@ -9,8 +9,17 @@ export async function parseMarkdown(markdown: string): Promise<string> {
 
   const rawHtml = await marked.parse(markdown);
 
-  const cleanHtml = DOMPurify.sanitize(rawHtml, {
-    USE_PROFILES: { html: true },
+  const cleanHtml = sanitizeHtml(rawHtml, {
+    allowedTags: sanitizeHtml.defaults.allowedTags.concat([
+      "h1", "h2", "h3", "h4", "h5", "h6", "img", "pre", "code"
+    ]),
+    allowedAttributes: {
+      ...sanitizeHtml.defaults.allowedAttributes,
+      img: ["src", "alt", "title"],
+      a: ["href", "title", "target"],
+      code: ["class"],
+      pre: ["class"],
+    },
   });
 
   return cleanHtml;
