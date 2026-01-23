@@ -24,8 +24,25 @@ export async function convertToEpub(input: ConvertInput): Promise<ConvertResult>
     const title = input.title || extractTitleFromFilename(input.filename);
     const author = input.author || "KindleCrafter";
 
-    const html = await parseMarkdown(input.markdown);
-    const epubBuffer = await generateEpub({ title, author, html });
+    console.log("[convertToEpub] Starting conversion for:", title);
+
+    let html: string;
+    try {
+      html = await parseMarkdown(input.markdown);
+      console.log("[convertToEpub] Markdown parsed successfully");
+    } catch (parseError) {
+      console.error("[convertToEpub] Markdown parsing failed:", parseError);
+      throw new Error(`Markdown parsing failed: ${parseError instanceof Error ? parseError.message : "Unknown error"}`);
+    }
+
+    let epubBuffer: Buffer;
+    try {
+      epubBuffer = await generateEpub({ title, author, html });
+      console.log("[convertToEpub] EPUB generated successfully, size:", epubBuffer.length);
+    } catch (epubError) {
+      console.error("[convertToEpub] EPUB generation failed:", epubError);
+      throw new Error(`EPUB generation failed: ${epubError instanceof Error ? epubError.message : "Unknown error"}`);
+    }
 
     const sanitizedTitle = title.replace(/[^a-zA-Z0-9\s]/g, "_");
 
@@ -36,6 +53,7 @@ export async function convertToEpub(input: ConvertInput): Promise<ConvertResult>
       filename: `${sanitizedTitle}.epub`,
     };
   } catch (error) {
+    console.error("[convertToEpub] Error:", error);
     return {
       success: false,
       message: `Failed to generate EPUB: ${error instanceof Error ? error.message : "Unknown error"}`,
