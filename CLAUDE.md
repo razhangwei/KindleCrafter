@@ -28,7 +28,7 @@ npx drizzle-kit push       # Push schema changes to database
 ```
 Markdown File → [ConversionForm] → Server Action
                                         ↓
-                              parseMarkdown (marked + DOMPurify)
+                              parseMarkdown (marked + sanitize-html)
                                         ↓
                               generateEpub (epub-gen-memory)
                                         ↓
@@ -49,6 +49,7 @@ Markdown File → [ConversionForm] → Server Action
 - **Server Actions**: All heavy processing (markdown parsing, EPUB generation, email) runs server-side
 - **Graceful Degradation**: App works without database or email configuration (download-only mode)
 - **Single-Record Settings**: Uses `limit(1)` pattern for user configuration
+- **Email Priority**: Gmail is tried first (easier setup), then Resend as fallback
 
 ## Environment Variables
 
@@ -58,6 +59,8 @@ RESEND_API_KEY      # Resend email service (optional)
 SENDER_EMAIL        # Sender address for Resend (optional)
 GMAIL_USER          # Gmail fallback (optional)
 GMAIL_APP_PASSWORD  # Gmail app password (optional)
+APP_PASSWORD        # Password protection for personal use (optional)
+SESSION_SECRET      # Secret for session tokens (required if APP_PASSWORD is set)
 ```
 
 ## Vercel Deployment
