@@ -1,0 +1,84 @@
+"use server";
+
+import { parseMarkdown, extractTitleFromFilename } from "@/lib/markdown";
+import { generateEpub } from "@/lib/epub";
+import { sendToKindle, isEmailConfigured } from "@/lib/email";
+import { getSettings } from "./settings";
+
+interface ConvertInput {
+  markdown: string;
+  filename: string;
+  title?: string;
+  author?: string;
+}
+
+interface ConvertResult {
+  success: boolean;
+  message: string;
+  epubBase64?: string;
+  filename?: string;
+}
+
+export async function convertToEpub(input: ConvertInput): Promise<ConvertResult> {
+  try {
+    const title = input.title || extractTitleFromFilename(input.filename);
+    const author = input.author || "KindleCrafter";
+
+    const html = await parseMarkdown(input.markdown);
+    const epubBuffer = await generateEpub({ title, author, html });
+
+    const sanitizedTitle = title.replace(/[^a-zA-Z0-9\s]/g, "_");
+
+    return {
+      success: true,
+      message: `EPUB generated successfully`,
+      epubBase64: epubBuffer.toString("base64"),
+      filename: `${sanitizedTitle}.epub`,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: `Failed to generate EPUB: ${error instanceof Error ? error.message : "Unknown error"}`,
+    };
+  }
+}
+
+export async function convertAndSend(input: ConvertInput): Promise<ConvertResult> {
+  const userSettings = await getSettings();
+
+  if (!userSettings?.kindleEmail) {
+    return { success: false, message: "Please configure your Kindle email first" };
+  }
+
+  if (!isEmailConfigured()) {
+    return { success: false, message: "Email sending is not configured. Please set RESEND_API_KEY and SENDER_EMAIL." };
+  }
+
+  try {
+    const title = input.title || extractTitleFromFilename(input.filename);
+    const author = input.author || "KindleCrafter";
+
+    const html = await parseMarkdown(input.markdown);
+    const epubBuffer = await generateEpub({ title, author, html });
+
+    await sendToKindle({
+      to: userSettings.kindleEmail,
+      title,
+      epubBuffer,
+    });
+
+    return {
+      success: true,
+      message: `"${title}" sent to your Kindle!`,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: `Failed to send: ${error instanceof Error ? error.message : "Unknown error"}`,
+    };
+  }
+}
+
+export async function checkEmailConfigured(): Promise<boolean> {
+  return isEmailConfigured();
+}
