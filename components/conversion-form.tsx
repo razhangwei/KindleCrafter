@@ -27,7 +27,7 @@ export function ConversionForm({
   const extractTitleFromFilename = (filename: string): string => {
     return filename
       .replace(/\.md$/i, "")
-      .replace(/[-_]/g, " ")
+      .replace(/_/g, " ")
       .replace(/\b\w/g, (c) => c.toUpperCase());
   };
 
