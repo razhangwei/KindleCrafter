@@ -1,5 +1,7 @@
 # KindleCrafter
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 Convert Markdown files to EPUB format and send them directly to your Kindle.
 
 ## Features
@@ -77,7 +79,7 @@ Open [http://localhost:3000](http://localhost:3000).
 
 Deploy to Vercel:
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/yourusername/kindle-crafter)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/razhangwei/KindleCrafter)
 
 The project includes `serverExternalPackages` configuration for Vercel compatibility.
 
