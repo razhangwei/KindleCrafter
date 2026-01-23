@@ -1,36 +1,86 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# KindleCrafter
+
+Convert Markdown files to EPUB format and send them directly to your Kindle.
+
+## Features
+
+- **Markdown to EPUB conversion** - Upload `.md` files and download as properly formatted EPUB
+- **Send to Kindle** - Deliver EPUBs directly to your Kindle via email
+- **GitHub Flavored Markdown** - Full support for GFM syntax
+- **Clean typography** - Styled output with serif fonts, proper spacing, and responsive images
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
+
+- Node.js 18+
+- PostgreSQL database (Supabase recommended)
+
+### Installation
+
+```bash
+npm install
+```
+
+### Environment Variables
+
+Create a `.env.local` file:
+
+```
+DATABASE_URL=postgresql://...
+
+# Email delivery (at least one required for Send to Kindle)
+RESEND_API_KEY=re_...
+SENDER_EMAIL=kindle@yourdomain.com
+
+# Or use Gmail as fallback
+GMAIL_USER=your@gmail.com
+GMAIL_APP_PASSWORD=xxxx xxxx xxxx xxxx
+```
+
+### Database Setup
+
+```bash
+npx drizzle-kit push
+```
+
+### Development
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Usage
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. **Upload** - Drag and drop or select a Markdown file
+2. **Edit metadata** - Adjust title and author if needed
+3. **Download** - Get the EPUB file directly, or
+4. **Send to Kindle** - Configure your Kindle email in Settings, then send
 
-## Learn More
+### Kindle Email Setup
 
-To learn more about Next.js, take a look at the following resources:
+1. Go to Settings and enter your Kindle email (ends with `@kindle.com`)
+2. Add your sender email to your [Amazon Approved Personal Document Email List](https://www.amazon.com/hz/mycd/myx#/home/settings/payment)
+3. Use "Send to Kindle" to deliver documents
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Tech Stack
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- **Framework**: Next.js 15+ (App Router)
+- **Database**: Supabase (PostgreSQL) + Drizzle ORM
+- **Styling**: Tailwind CSS v4 + shadcn/ui
+- **Conversion**: marked + epub-gen-memory
+- **Email**: Resend / Gmail (nodemailer)
 
-## Deploy on Vercel
+## Deployment
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Deploy to Vercel:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/yourusername/kindle-crafter)
+
+The project includes `serverExternalPackages` configuration for Vercel compatibility.
+
+## License
+
+MIT
