@@ -4,12 +4,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Tech Stack
 
-**Frontend:** Next.js 15+ (App Router)
-**Backend:** Server Actions (collocated with frontend)
-**Database:** Supabase (Postgres) + Drizzle ORM
-**Styling:** Tailwind CSS v4 + shadcn/ui
-**Deployment:** Vercel
-**Language:** TypeScript (strict mode)
+- **Frontend:** Next.js 15+ (App Router)
+- **Backend:** Server Actions (collocated with frontend)
+- **Database:** Supabase (Postgres) + Drizzle ORM
+- **Styling:** Tailwind CSS v4 + shadcn/ui
+- **Deployment:** Vercel
+- **Language:** TypeScript (strict mode)
 
 ## Development Commands
 
