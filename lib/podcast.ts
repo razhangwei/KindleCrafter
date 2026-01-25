@@ -66,6 +66,50 @@ async function getRssFeedUrl(podcastId: string): Promise<{ feedUrl: string; podc
 }
 
 /**
+ * Look up episode details from iTunes API to get the RSS GUID
+ * Apple's episode IDs don't match RSS GUIDs, so we need to query Apple's API
+ */
+async function getEpisodeGuidFromItunes(
+  podcastId: string,
+  episodeId: string
+): Promise<{ episodeGuid: string; episodeTitle: string }> {
+  // Fetch episodes from iTunes (limit to recent 200 episodes)
+  const lookupUrl = `https://itunes.apple.com/lookup?id=${podcastId}&entity=podcastEpisode&limit=200`;
+
+  const response = await fetch(lookupUrl);
+  if (!response.ok) {
+    throw new Error(`iTunes API request failed: ${response.status}`);
+  }
+
+  const data = await response.json();
+
+  if (!data.results || data.results.length === 0) {
+    throw new Error("Podcast not found on iTunes");
+  }
+
+  // Find the episode with matching trackId (Apple's episode ID)
+  const episode = data.results.find(
+    (r: { wrapperType: string; trackId: number }) =>
+      r.wrapperType === "podcastEpisode" && r.trackId === parseInt(episodeId, 10)
+  );
+
+  if (!episode) {
+    throw new Error(
+      "Episode not found in iTunes. The episode may be too old (only recent 200 episodes are checked) or no longer available."
+    );
+  }
+
+  if (!episode.episodeGuid) {
+    throw new Error("Episode GUID not available from iTunes");
+  }
+
+  return {
+    episodeGuid: episode.episodeGuid,
+    episodeTitle: episode.trackName || "Untitled Episode",
+  };
+}
+
+/**
  * Parse duration string (HH:MM:SS or MM:SS or seconds) to seconds
  */
 function parseDuration(duration: string | undefined): number | undefined {
@@ -97,9 +141,9 @@ function extractXmlContent(xml: string, tag: string): string | undefined {
 }
 
 /**
- * Fetch and parse RSS feed to find episode by ID
+ * Fetch and parse RSS feed to find episode by GUID
  */
-async function parseRssFeed(feedUrl: string, episodeId: string, podcastName: string): Promise<RSSEpisode> {
+async function parseRssFeed(feedUrl: string, episodeGuid: string, podcastName: string): Promise<RSSEpisode> {
   const response = await fetch(feedUrl, {
     headers: {
       "User-Agent": "KindleCrafter/1.0",
@@ -112,26 +156,19 @@ async function parseRssFeed(feedUrl: string, episodeId: string, podcastName: str
 
   const xmlText = await response.text();
 
-  // Find all items and search for the one with matching episode ID
+  // Find all items and search for the one with matching GUID
   const itemRegex = /<item>([\s\S]*?)<\/item>/g;
   let match;
 
   while ((match = itemRegex.exec(xmlText)) !== null) {
     const itemXml = match[1];
 
-    // Check if this item matches our episode ID
-    // Apple's episode ID can appear in guid, as an attribute, or in URLs
+    // Extract the GUID from this item
     const guidMatch = itemXml.match(/<guid[^>]*>(?:<!\[CDATA\[)?([^\]<]+)(?:\]\]>)?<\/guid>/);
     const enclosureMatch = itemXml.match(/<enclosure[^>]+url=["']([^"']+)["']/);
 
-    // Check various ways the episode might be identified
-    const itemContent = itemXml.toLowerCase();
-    const hasEpisodeId =
-      itemContent.includes(episodeId) ||
-      guidMatch?.[1]?.includes(episodeId) ||
-      enclosureMatch?.[1]?.includes(episodeId);
-
-    if (hasEpisodeId && enclosureMatch) {
+    // Match by GUID (exact match)
+    if (guidMatch?.[1] === episodeGuid && enclosureMatch) {
       const title = extractXmlContent(itemXml, "title") || "Untitled Episode";
       const durationMatch = itemXml.match(/<itunes:duration>([^<]+)<\/itunes:duration>/);
       const pubDateMatch = itemXml.match(/<pubDate>([^<]+)<\/pubDate>/);
@@ -163,10 +200,14 @@ export async function extractPodcastAudio(appleUrl: string): Promise<{
 
   console.log("[extractPodcastAudio] Looking up podcast:", podcastId, "episode:", episodeId);
 
+  // Get the RSS GUID from iTunes API (Apple's episode ID doesn't match RSS GUID)
+  const { episodeGuid, episodeTitle } = await getEpisodeGuidFromItunes(podcastId, episodeId);
+  console.log("[extractPodcastAudio] Found episode GUID:", episodeGuid, "title:", episodeTitle);
+
   const { feedUrl, podcastName } = await getRssFeedUrl(podcastId);
   console.log("[extractPodcastAudio] Found RSS feed:", feedUrl);
 
-  const episode = await parseRssFeed(feedUrl, episodeId, podcastName);
+  const episode = await parseRssFeed(feedUrl, episodeGuid, podcastName);
   console.log("[extractPodcastAudio] Found episode:", episode.title);
 
   return {
