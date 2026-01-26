@@ -44,7 +44,7 @@ export async function convertToEpub(input: ConvertInput): Promise<ConvertResult>
       throw new Error(`EPUB generation failed: ${epubError instanceof Error ? epubError.message : "Unknown error"}`);
     }
 
-    const sanitizedTitle = title.replace(/[^a-zA-Z0-9\s]/g, "_");
+    const sanitizedTitle = title.replace(/[\\/:*?"<>|]/g, "_");
 
     return {
       success: true,

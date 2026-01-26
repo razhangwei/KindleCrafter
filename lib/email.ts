@@ -41,7 +41,7 @@ async function sendViaResend({ to, title, epubBuffer }: SendOptions): Promise<vo
   }
 
   const resend = getResendClient();
-  const sanitizedTitle = title.replace(/[^a-zA-Z0-9\s]/g, "_");
+  const sanitizedTitle = title.replace(/[\\/:*?"<>|]/g, "_");
 
   const { error } = await resend.emails.send({
     from: senderEmail,
@@ -63,7 +63,7 @@ async function sendViaResend({ to, title, epubBuffer }: SendOptions): Promise<vo
 
 async function sendViaGmail({ to, title, epubBuffer }: SendOptions): Promise<void> {
   const transport = getGmailTransport();
-  const sanitizedTitle = title.replace(/[^a-zA-Z0-9\s]/g, "_");
+  const sanitizedTitle = title.replace(/[\\/:*?"<>|]/g, "_");
 
   await transport.sendMail({
     from: process.env.GMAIL_USER,
