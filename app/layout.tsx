@@ -18,7 +18,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "KindleCrafter",
-  description: "Convert Markdown to EPUB and send to your Kindle",
+  description: "Convert content to EPUB and send to your Kindle",
 };
 
 export default async function RootLayout({

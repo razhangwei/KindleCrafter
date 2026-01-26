@@ -2,14 +2,26 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-Convert Markdown files to EPUB format and send them directly to your Kindle.
+Convert content to EPUB format and send it directly to your Kindle.
 
-## Features
+## What You Can Convert
 
-- **Markdown to EPUB conversion** - Upload `.md` files and download as properly formatted EPUB
+### Markdown Files
+- Upload `.md` files with full GitHub Flavored Markdown support
+- Download EPUB instantly or send to Kindle
+- Preserves code blocks, tables, and formatting
+
+### Podcast Episodes
+- Transcribe Apple Podcast episodes to readable text
+- Automatic speaker detection and chapter segmentation
+- Delivered directly to your Kindle
+
+## Core Features
+
 - **Send to Kindle** - Deliver EPUBs directly to your Kindle via email
+- **Clean Typography** - Styled output with serif fonts, proper spacing, and responsive images
+- **Privacy-Focused** - All processing happens on your server
 - **GitHub Flavored Markdown** - Full support for GFM syntax
-- **Clean typography** - Styled output with serif fonts, proper spacing, and responsive images
 
 ## Getting Started
 
@@ -38,6 +50,13 @@ SENDER_EMAIL=kindle@yourdomain.com
 # Or use Gmail as fallback
 GMAIL_USER=your@gmail.com
 GMAIL_APP_PASSWORD=xxxx xxxx xxxx xxxx
+
+# Podcast Transcription (Optional - required for podcast feature)
+GEMINI_API_KEY=...
+
+# Background Jobs (Optional - required for podcast feature)
+INNGEST_EVENT_KEY=...
+INNGEST_SIGNING_KEY=...
 ```
 
 ### Database Setup
@@ -56,10 +75,17 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ## Usage
 
-1. **Upload** - Drag and drop or select a Markdown file
-2. **Edit metadata** - Adjust title and author if needed
-3. **Download** - Get the EPUB file directly, or
-4. **Send to Kindle** - Configure your Kindle email in Settings, then send
+### Converting Markdown Files
+1. Navigate to the home page
+2. Upload or drag-and-drop a `.md` file
+3. Edit title and author metadata as needed
+4. Choose **Download** for immediate EPUB, or **Send to Kindle** for email delivery
+
+### Transcribing Podcasts
+1. Navigate to **Podcast** in the header
+2. Find an episode on [Apple Podcasts](https://podcasts.apple.com)
+3. Copy the episode URL (must include `/id{podcast-id}?i={episode-id}`)
+4. Paste and submit - transcript arrives on your Kindle in a few minutes
 
 ### Kindle Email Setup
 
@@ -74,6 +100,8 @@ Open [http://localhost:3000](http://localhost:3000).
 - **Styling**: Tailwind CSS v4 + shadcn/ui
 - **Conversion**: marked + epub-gen-memory
 - **Email**: Resend / Gmail (nodemailer)
+- **Transcription**: Google Gemini API
+- **Background Jobs**: Inngest
 
 ## Deployment
 
