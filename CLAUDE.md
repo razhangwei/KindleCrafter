@@ -84,8 +84,8 @@ Apple Podcast URL → [PodcastForm] → submitPodcastJob (Server Action)
 ### Patterns
 
 - **Server Actions**: All heavy processing (markdown parsing, EPUB generation, email) runs server-side
-- **Graceful Degradation**: App works without database or email configuration (download-only mode)
-- **Single-Record Settings**: Uses `limit(1)` pattern for user configuration
+- **Multi-User Support**: Each user has their own account with email/password authentication
+- **Per-User Settings**: Each user has their own Kindle email configuration stored in the settings table
 - **Email Priority**: Gmail is tried first (easier setup), then Resend as fallback
 - **Async Job Pattern**: Long-running tasks (podcast transcription) use Inngest for background processing with retries
 - **Pipeline Convergence**: Both input types converge at EPUB generation (parseMarkdown → generateEpub)
@@ -116,10 +116,9 @@ INNGEST_EVENT_KEY   # Inngest event key
 INNGEST_SIGNING_KEY # Inngest signing key
 ```
 
-### Security (optional)
+### Authentication (required)
 ```env
-APP_PASSWORD        # Password protection for personal use
-SESSION_SECRET      # Secret for session tokens (required if APP_PASSWORD is set)
+SESSION_SECRET      # Secret for session tokens (required for user authentication)
 ```
 
 ## Podcast Feature Architecture

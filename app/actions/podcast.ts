@@ -4,6 +4,7 @@ import { inngest } from "@/lib/inngest";
 import { parseApplePodcastUrl, extractPodcastAudio, isGeminiConfigured } from "@/lib/podcast";
 import { isEmailConfigured } from "@/lib/email";
 import { getSettings } from "./settings";
+import { getCurrentUser } from "./auth";
 
 const MAX_DURATION_SECONDS = 3600; // 1 hour limit
 
@@ -31,6 +32,15 @@ function validatePodcastUrl(url: string): { valid: boolean; error?: string } {
  * Submit a podcast transcription job
  */
 export async function submitPodcastJob(url: string): Promise<SubmitResult> {
+  // Check user authentication
+  const user = await getCurrentUser();
+  if (!user) {
+    return {
+      success: false,
+      message: "Please log in to submit a podcast job.",
+    };
+  }
+
   // Check Kindle email configuration
   const settings = await getSettings();
   if (!settings?.kindleEmail) {
@@ -84,12 +94,13 @@ export async function submitPodcastJob(url: string): Promise<SubmitResult> {
     };
   }
 
-  // Queue the background job
+  // Queue the background job with user context
   try {
     await inngest.send({
       name: "podcast/transcribe.requested",
       data: {
         podcastUrl: url,
+        userId: user.id,
         kindleEmail: settings.kindleEmail,
       },
     });

@@ -7,15 +7,10 @@ const SESSION_DURATION = 7 * 24 * 60 * 60 * 1000; // 7 days
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Check if password protection is enabled
-  const appPassword = process.env.APP_PASSWORD;
-  if (!appPassword) {
-    return NextResponse.next();
-  }
-
-  // Allow access to login page and static assets
+  // Allow access to auth pages and static assets
   if (
     pathname === "/login" ||
+    pathname === "/register" ||
     pathname.startsWith("/_next") ||
     pathname.startsWith("/api") ||
     pathname.includes(".")
@@ -30,7 +25,7 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
-  // Validate session token
+  // Validate session token (format: userId:timestamp:secret)
   try {
     const secret = process.env.SESSION_SECRET;
     if (!secret) {
@@ -39,11 +34,11 @@ export function middleware(request: NextRequest) {
 
     const decoded = Buffer.from(sessionToken, "base64").toString("utf-8");
     const parts = decoded.split(":");
-    if (parts.length !== 2) {
+    if (parts.length !== 3) {
       return NextResponse.redirect(new URL("/login", request.url));
     }
 
-    const [timestamp, tokenSecret] = parts;
+    const [, timestamp, tokenSecret] = parts;
 
     if (tokenSecret !== secret) {
       return NextResponse.redirect(new URL("/login", request.url));

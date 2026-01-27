@@ -1,9 +1,9 @@
-import { LoginForm } from "@/components/login-form";
+import { RegisterForm } from "@/components/register-form";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { validateSessionToken, SESSION_COOKIE_NAME } from "@/lib/auth";
 
-export default async function LoginPage() {
+export default async function RegisterPage() {
   // If already logged in, redirect to home
   const cookieStore = await cookies();
   const sessionToken = cookieStore.get(SESSION_COOKIE_NAME)?.value;
@@ -14,7 +14,7 @@ export default async function LoginPage() {
 
   return (
     <div className="min-h-[60vh] flex items-center justify-center">
-      <LoginForm />
+      <RegisterForm />
     </div>
   );
 }

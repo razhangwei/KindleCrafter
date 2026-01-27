@@ -4,6 +4,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { LogoutButton } from "@/components/logout-button";
 import { cookies } from "next/headers";
 import Link from "next/link";
+import { validateSessionToken, SESSION_COOKIE_NAME } from "@/lib/auth";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -27,8 +28,9 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const cookieStore = await cookies();
-  const isAuthenticated = !!cookieStore.get("kindle_crafter_session")?.value;
-  const isPasswordProtected = !!process.env.APP_PASSWORD;
+  const sessionToken = cookieStore.get(SESSION_COOKIE_NAME)?.value;
+  const session = sessionToken ? validateSessionToken(sessionToken) : null;
+  const isAuthenticated = !!session;
 
   return (
     <html lang="en" suppressHydrationWarning>
@@ -41,25 +43,29 @@ export default async function RootLayout({
               KindleCrafter
             </Link>
             <div className="flex items-center gap-4">
-              <Link
-                href="/"
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-              >
-                Markdown
-              </Link>
-              <Link
-                href="/podcast"
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-              >
-                Podcast
-              </Link>
-              <Link
-                href="/settings"
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-              >
-                Settings
-              </Link>
-              {isAuthenticated && isPasswordProtected && <LogoutButton />}
+              {isAuthenticated && (
+                <>
+                  <Link
+                    href="/"
+                    className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    Markdown
+                  </Link>
+                  <Link
+                    href="/podcast"
+                    className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    Podcast
+                  </Link>
+                  <Link
+                    href="/settings"
+                    className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    Settings
+                  </Link>
+                  <LogoutButton />
+                </>
+              )}
             </div>
           </nav>
         </header>

@@ -8,6 +8,7 @@ interface TranscribePodcastEvent {
   name: "podcast/transcribe.requested";
   data: {
     podcastUrl: string;
+    userId: string;
     kindleEmail: string;
   };
 }
