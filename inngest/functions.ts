@@ -1,6 +1,6 @@
 import { inngest } from "@/lib/inngest";
 import { extractPodcastAudio, transcribePodcast } from "@/lib/podcast";
-import { parseMarkdown } from "@/lib/markdown";
+import { parseMarkdown, removeFirstH1IfMatchesTitle } from "@/lib/markdown";
 import { generateEpub } from "@/lib/epub";
 import { sendToKindle } from "@/lib/email";
 
@@ -36,7 +36,9 @@ export const transcribePodcastJob = inngest.createFunction(
     // Step 3: Convert to EPUB
     const epubBase64 = await step.run("generate-epub", async () => {
       console.log("[transcribePodcastJob] Generating EPUB");
-      const html = await parseMarkdown(markdown);
+      // Remove first H1 if it matches the title to avoid duplication on Kindle
+      const processedMarkdown = removeFirstH1IfMatchesTitle(markdown, metadata.title);
+      const html = await parseMarkdown(processedMarkdown);
       const epubBuffer = await generateEpub({
         title: metadata.title,
         author: metadata.podcastName,
