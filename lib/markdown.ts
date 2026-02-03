@@ -40,3 +40,17 @@ export function extractTitleFromMarkdown(markdown: string): string | null {
   }
   return null;
 }
+
+export function removeFirstH1IfMatchesTitle(markdown: string, title: string): string {
+  // Match first H1 heading at the start of a line
+  const h1Match = markdown.match(/^(#\s+(.+))$/m);
+  if (h1Match && h1Match[2]) {
+    const extractedTitle = h1Match[2].trim();
+    // Only remove if the extracted title matches the provided title
+    if (extractedTitle === title) {
+      // Remove the first H1 line and any immediately following blank lines
+      return markdown.replace(/^#\s+.+\n*/, '');
+    }
+  }
+  return markdown;
+}

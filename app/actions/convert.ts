@@ -1,6 +1,6 @@
 "use server";
 
-import { parseMarkdown, extractTitleFromFilename } from "@/lib/markdown";
+import { parseMarkdown, extractTitleFromFilename, removeFirstH1IfMatchesTitle } from "@/lib/markdown";
 import { generateEpub } from "@/lib/epub";
 import { sendToKindle, isEmailConfigured } from "@/lib/email";
 import { getSettings } from "./settings";
@@ -26,9 +26,12 @@ export async function convertToEpub(input: ConvertInput): Promise<ConvertResult>
 
     console.log("[convertToEpub] Starting conversion for:", title);
 
+    // Remove first H1 if it matches the title to avoid duplication on Kindle
+    const processedMarkdown = removeFirstH1IfMatchesTitle(input.markdown, title);
+
     let html: string;
     try {
-      html = await parseMarkdown(input.markdown);
+      html = await parseMarkdown(processedMarkdown);
       console.log("[convertToEpub] Markdown parsed successfully");
     } catch (parseError) {
       console.error("[convertToEpub] Markdown parsing failed:", parseError);
@@ -76,7 +79,10 @@ export async function convertAndSend(input: ConvertInput): Promise<ConvertResult
     const title = input.title || extractTitleFromFilename(input.filename);
     const author = input.author || "KindleCrafter";
 
-    const html = await parseMarkdown(input.markdown);
+    // Remove first H1 if it matches the title to avoid duplication on Kindle
+    const processedMarkdown = removeFirstH1IfMatchesTitle(input.markdown, title);
+
+    const html = await parseMarkdown(processedMarkdown);
     const epubBuffer = await generateEpub({ title, author, html });
 
     await sendToKindle({
