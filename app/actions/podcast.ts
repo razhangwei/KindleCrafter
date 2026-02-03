@@ -1,7 +1,13 @@
 "use server";
 
 import { inngest } from "@/lib/inngest";
-import { parseApplePodcastUrl, extractPodcastAudio, isGeminiConfigured } from "@/lib/podcast";
+import {
+  parseApplePodcastUrl,
+  parseYoutubeUrl,
+  extractAudio,
+  detectSourceType,
+  isGeminiConfigured,
+} from "@/lib/podcast";
 import { isEmailConfigured } from "@/lib/email";
 import { getSettings } from "./settings";
 
@@ -13,11 +19,24 @@ interface SubmitResult {
 }
 
 /**
- * Validate Apple Podcast URL format
+ * Validate URL format (Apple Podcasts or YouTube)
  */
-function validatePodcastUrl(url: string): { valid: boolean; error?: string } {
+function validateUrl(url: string): { valid: boolean; error?: string } {
+  const sourceType = detectSourceType(url);
+
+  if (!sourceType) {
+    return {
+      valid: false,
+      error: "Unsupported URL format. Please provide an Apple Podcasts or YouTube URL.",
+    };
+  }
+
   try {
-    parseApplePodcastUrl(url);
+    if (sourceType === "apple") {
+      parseApplePodcastUrl(url);
+    } else if (sourceType === "youtube") {
+      parseYoutubeUrl(url);
+    }
     return { valid: true };
   } catch (error) {
     return {
@@ -57,18 +76,18 @@ export async function submitPodcastJob(url: string): Promise<SubmitResult> {
   }
 
   // Validate URL format
-  const urlValidation = validatePodcastUrl(url);
+  const urlValidation = validateUrl(url);
   if (!urlValidation.valid) {
     return {
       success: false,
-      message: urlValidation.error || "Invalid Apple Podcast URL",
+      message: urlValidation.error || "Invalid URL format",
     };
   }
 
-  // Optionally check episode duration before queueing
-  // (This adds latency but prevents wasting resources on long episodes)
+  // Check duration before queueing
+  // (This adds latency but prevents wasting resources on long content)
   try {
-    const { metadata } = await extractPodcastAudio(url);
+    const { metadata } = await extractAudio(url);
 
     if (metadata.durationSeconds && metadata.durationSeconds > MAX_DURATION_SECONDS) {
       const minutes = Math.round(metadata.durationSeconds / 60);

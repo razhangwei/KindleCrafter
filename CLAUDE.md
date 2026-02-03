@@ -46,11 +46,12 @@ Markdown File → [ConversionForm] → convertMarkdown (Server Action)
                     Download (Base64)            Send to Kindle (email)
 ```
 
-#### Podcast Transcription (Asynchronous)
+#### Podcast/Video Transcription (Asynchronous)
 
 ```
-Apple Podcast URL → [PodcastForm] → submitPodcastJob (Server Action)
-                                            ↓
+Apple Podcasts URL  ──┐
+                      ├──→ [PodcastForm] → submitPodcastJob (Server Action)
+YouTube URL ──────────┘                           ↓
                                     Validate config & duration
                                             ↓
                                     Queue Inngest event
@@ -58,25 +59,25 @@ Apple Podcast URL → [PodcastForm] → submitPodcastJob (Server Action)
                                             ↓
                     ┌───────────────────────┴───────────────────────┐
                     ↓                                               ↓
-        Step 1-2: extractPodcastAudio                  Inngest Background Job
-        - iTunes API → RSS feed                        (inngest/functions.ts)
-        - Parse RSS → Audio URL                        - 5 steps
+        Step 1: extractAudio                           Inngest Background Job
+        - Apple: iTunes API → RSS → Audio URL          (inngest/functions.ts)
+        - YouTube: ytdl-core → Audio stream            - 5 steps
                     ↓                                   - 2 retries
-        Step 3: transcribePodcast
+        Step 2: transcribePodcast
         - Download audio
         - Gemini 2.5 Flash transcription
         - Format as Markdown
                     ↓
-        Step 4: parseMarkdown → HTML
+        Step 3: parseMarkdown → HTML
                     ↓
-        Step 5: generateEpub → sendToKindle
+        Step 4-5: generateEpub → sendToKindle
 ```
 
 ### Key Directories
 
 - `app/actions/` - Server Actions for conversion (`convert.ts`), podcast (`podcast.ts`), and settings (`settings.ts`)
-- `app/podcast/` - Podcast transcription UI
-- `lib/` - Core utilities: `markdown.ts` (parsing), `epub.ts` (generation), `email.ts` (delivery), `podcast.ts` (Apple Podcasts → Audio + Gemini transcription)
+- `app/podcast/` - Podcast/video transcription UI
+- `lib/` - Core utilities: `markdown.ts` (parsing), `epub.ts` (generation), `email.ts` (delivery), `podcast.ts` (Apple Podcasts/YouTube → Audio + Gemini transcription)
 - `inngest/` - Background job functions (`functions.ts`)
 - `db/` - Drizzle ORM schema and connection
 - `components/ui/` - shadcn/ui components
@@ -122,16 +123,22 @@ APP_PASSWORD        # Password protection for personal use
 SESSION_SECRET      # Secret for session tokens (required if APP_PASSWORD is set)
 ```
 
-## Podcast Feature Architecture
+## Podcast/Video Feature Architecture
+
+### Supported Sources
+
+- **Apple Podcasts**: `https://podcasts.apple.com/.../id{podcast-id}?i={episode-id}`
+- **YouTube**: `https://youtube.com/watch?v=VIDEO_ID`, `https://youtu.be/VIDEO_ID`, shorts, embeds
 
 ### Processing Pipeline
 
-1. **URL Submission**: User provides Apple Podcasts episode URL
+1. **URL Submission**: User provides Apple Podcasts episode URL or YouTube video URL
 2. **Pre-flight Validation**: Check Kindle email, email service, and Gemini API configuration
-3. **Duration Check**: Pre-fetch metadata from iTunes API, reject episodes >60 minutes
-4. **Job Queueing**: Send `podcast/transcribe.requested` event to Inngest
-5. **Background Processing** (5 steps with 2 retries):
-   - Extract audio URL from iTunes API + RSS feed
+3. **Source Detection**: Automatically detect URL type and route to appropriate handler
+4. **Duration Check**: Pre-fetch metadata, reject content >60 minutes
+5. **Job Queueing**: Send `podcast/transcribe.requested` event to Inngest
+6. **Background Processing** (5 steps with 2 retries):
+   - Extract audio URL (Apple: iTunes API + RSS feed, YouTube: ytdl-core)
    - Download audio file (streams large files >20MB to Gemini Files API)
    - Transcribe with Gemini 2.5 Flash using custom Kindle-optimized prompt
    - Convert transcript Markdown → EPUB
@@ -140,9 +147,9 @@ SESSION_SECRET      # Secret for session tokens (required if APP_PASSWORD is set
 ### Technical Constraints
 
 - **Duration Limit**: 60 minutes max (enforced in `app/actions/podcast.ts`)
-- **Apple Podcasts Only**: Uses iTunes API + RSS feed parsing
-- **Recent Episodes**: iTunes API returns max 200 episodes
-- **Processing Time**: ~2-4 minutes for typical 30-45 minute episodes
+- **Apple Podcasts**: Uses iTunes API + RSS feed parsing (max 200 recent episodes)
+- **YouTube**: Uses @distube/ytdl-core for audio extraction
+- **Processing Time**: ~2-4 minutes for typical 30-45 minute content
 - **Gemini Model**: gemini-2.5-flash (supports audio input up to ~1 hour)
 
 ### Transcription Prompt Features

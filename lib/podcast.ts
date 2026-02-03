@@ -1,4 +1,7 @@
 import { GoogleGenAI } from "@google/genai";
+import ytdl from "@distube/ytdl-core";
+
+export type SourceType = "apple" | "youtube";
 
 export interface PodcastMetadata {
   title: string;
@@ -6,6 +9,7 @@ export interface PodcastMetadata {
   durationSeconds?: number;
   publishDate?: string;
   description?: string;
+  source?: SourceType;
 }
 
 interface RSSEpisode {
@@ -218,26 +222,173 @@ export async function extractPodcastAudio(appleUrl: string): Promise<{
       durationSeconds: parseDuration(episode.duration),
       publishDate: episode.pubDate,
       description: episode.description,
+      source: "apple" as SourceType,
     },
   };
+}
+
+/**
+ * Detect the source type from a URL
+ */
+export function detectSourceType(url: string): SourceType | null {
+  if (
+    url.includes("podcasts.apple.com") ||
+    url.includes("itunes.apple.com")
+  ) {
+    return "apple";
+  }
+
+  if (
+    url.includes("youtube.com") ||
+    url.includes("youtu.be")
+  ) {
+    return "youtube";
+  }
+
+  return null;
+}
+
+/**
+ * Parse YouTube URL to extract video ID
+ * Supports formats:
+ * - https://www.youtube.com/watch?v=VIDEO_ID
+ * - https://youtu.be/VIDEO_ID
+ * - https://www.youtube.com/embed/VIDEO_ID
+ * - https://www.youtube.com/v/VIDEO_ID
+ * - https://www.youtube.com/shorts/VIDEO_ID
+ */
+export function parseYoutubeUrl(url: string): { videoId: string } {
+  // Standard watch URL: youtube.com/watch?v=VIDEO_ID
+  const watchMatch = url.match(/[?&]v=([a-zA-Z0-9_-]{11})/);
+  if (watchMatch) {
+    return { videoId: watchMatch[1] };
+  }
+
+  // Short URL: youtu.be/VIDEO_ID
+  const shortMatch = url.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/);
+  if (shortMatch) {
+    return { videoId: shortMatch[1] };
+  }
+
+  // Embed URL: youtube.com/embed/VIDEO_ID
+  const embedMatch = url.match(/youtube\.com\/embed\/([a-zA-Z0-9_-]{11})/);
+  if (embedMatch) {
+    return { videoId: embedMatch[1] };
+  }
+
+  // Old v URL: youtube.com/v/VIDEO_ID
+  const vMatch = url.match(/youtube\.com\/v\/([a-zA-Z0-9_-]{11})/);
+  if (vMatch) {
+    return { videoId: vMatch[1] };
+  }
+
+  // Shorts URL: youtube.com/shorts/VIDEO_ID
+  const shortsMatch = url.match(/youtube\.com\/shorts\/([a-zA-Z0-9_-]{11})/);
+  if (shortsMatch) {
+    return { videoId: shortsMatch[1] };
+  }
+
+  throw new Error(
+    "Invalid YouTube URL format. Expected format: https://youtube.com/watch?v=VIDEO_ID or https://youtu.be/VIDEO_ID"
+  );
+}
+
+/**
+ * Extract audio URL and metadata from YouTube video
+ */
+export async function extractYoutubeAudio(youtubeUrl: string): Promise<{
+  audioUrl: string;
+  metadata: PodcastMetadata;
+}> {
+  const { videoId } = parseYoutubeUrl(youtubeUrl);
+
+  console.log("[extractYoutubeAudio] Getting info for video:", videoId);
+
+  // Get video info using ytdl-core
+  const info = await ytdl.getInfo(videoId);
+
+  const title = info.videoDetails.title;
+  const channelName = info.videoDetails.author.name;
+  const durationSeconds = parseInt(info.videoDetails.lengthSeconds, 10);
+  const publishDate = info.videoDetails.publishDate;
+  const description = info.videoDetails.description || undefined;
+
+  // Get the best audio format
+  const audioFormats = ytdl.filterFormats(info.formats, "audioonly");
+
+  if (audioFormats.length === 0) {
+    throw new Error("No audio formats available for this video");
+  }
+
+  // Prefer formats with higher audio quality
+  const sortedFormats = audioFormats.sort((a, b) => {
+    const aBitrate = a.audioBitrate || 0;
+    const bBitrate = b.audioBitrate || 0;
+    return bBitrate - aBitrate;
+  });
+
+  const bestAudio = sortedFormats[0];
+
+  if (!bestAudio.url) {
+    throw new Error("Failed to get audio stream URL");
+  }
+
+  console.log("[extractYoutubeAudio] Found audio format:", bestAudio.mimeType, "bitrate:", bestAudio.audioBitrate);
+
+  return {
+    audioUrl: bestAudio.url,
+    metadata: {
+      title,
+      podcastName: channelName,
+      durationSeconds,
+      publishDate,
+      description,
+      source: "youtube" as SourceType,
+    },
+  };
+}
+
+/**
+ * Unified function to extract audio from either Apple Podcasts or YouTube
+ */
+export async function extractAudio(url: string): Promise<{
+  audioUrl: string;
+  metadata: PodcastMetadata;
+}> {
+  const sourceType = detectSourceType(url);
+
+  if (sourceType === "apple") {
+    return extractPodcastAudio(url);
+  }
+
+  if (sourceType === "youtube") {
+    return extractYoutubeAudio(url);
+  }
+
+  throw new Error(
+    "Unsupported URL format. Please provide an Apple Podcasts or YouTube URL."
+  );
 }
 
 /**
  * Build the Gemini prompt for transcription + formatting
  */
 function buildTranscriptionPrompt(metadata: PodcastMetadata): string {
-  return `You are transcribing a podcast episode for reading on a Kindle e-reader.
+  const sourceLabel = metadata.source === "youtube" ? "YouTube video" : "podcast episode";
+  const channelLabel = metadata.source === "youtube" ? "Channel" : "Podcast";
 
-PODCAST INFO:
+  return `You are transcribing a ${sourceLabel} for reading on a Kindle e-reader.
+
+CONTENT INFO:
 - Title: ${metadata.title}
-- Podcast: ${metadata.podcastName}
+- ${channelLabel}: ${metadata.podcastName}
 ${metadata.publishDate ? `- Published: ${metadata.publishDate}` : ""}
 
 TRANSCRIPTION REQUIREMENTS:
 
 1. **Format as Markdown** suitable for book reading:
-   - Start with a level 1 heading (# Episode Title)
-   - Add a brief intro paragraph with podcast name and date if available
+   - Start with a level 1 heading (# Title)
+   - Add a brief intro paragraph with ${channelLabel.toLowerCase()} name and date if available
 
 2. **Chapter/Section Headings**:
    - Automatically detect topic changes and insert level 2 headings (##)

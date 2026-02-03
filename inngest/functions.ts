@@ -1,5 +1,5 @@
 import { inngest } from "@/lib/inngest";
-import { extractPodcastAudio, transcribePodcast } from "@/lib/podcast";
+import { extractAudio, transcribePodcast } from "@/lib/podcast";
 import { parseMarkdown } from "@/lib/markdown";
 import { generateEpub } from "@/lib/epub";
 import { sendToKindle } from "@/lib/email";
@@ -21,10 +21,10 @@ export const transcribePodcastJob = inngest.createFunction(
   async ({ event, step }) => {
     const { podcastUrl, kindleEmail } = event.data as TranscribePodcastEvent["data"];
 
-    // Step 1: Extract audio URL from Apple Podcast
+    // Step 1: Extract audio URL from Apple Podcasts or YouTube
     const { audioUrl, metadata } = await step.run("extract-audio", async () => {
       console.log("[transcribePodcastJob] Extracting audio from:", podcastUrl);
-      return extractPodcastAudio(podcastUrl);
+      return extractAudio(podcastUrl);
     });
 
     // Step 2: Transcribe with Gemini
