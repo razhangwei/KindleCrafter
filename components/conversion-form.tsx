@@ -6,8 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
 import { convertToEpub, convertAndSend } from "@/app/actions/convert";
 import { toast } from "sonner";
+import { extractTitleFromMarkdown } from "@/lib/markdown";
 
 interface ConversionFormProps {
   kindleEmailConfigured: boolean;
@@ -23,6 +26,7 @@ export function ConversionForm({
   const [title, setTitle] = useState<string>("");
   const [author, setAuthor] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
+  const [inputMode, setInputMode] = useState<"file" | "paste">("file");
 
   const extractTitleFromFilename = (filename: string): string => {
     return filename
@@ -43,9 +47,37 @@ export function ConversionForm({
     setTitle(extractTitleFromFilename(selectedFile.name));
   }, []);
 
+  const handlePasteChange = useCallback((text: string) => {
+    // Size validation (4MB limit)
+    const sizeInBytes = new Blob([text]).size;
+    if (sizeInBytes > 4 * 1024 * 1024) {
+      toast.error("Text too large. Maximum size is 4MB.");
+      return;
+    }
+
+    setMarkdown(text);
+
+    // Try to extract title from first H1
+    const extractedTitle = extractTitleFromMarkdown(text);
+    if (extractedTitle) {
+      setTitle(extractedTitle);
+    } else {
+      setTitle(""); // Clear title, user must provide
+    }
+  }, []);
+
   const handleDownload = async () => {
-    if (!file || !markdown) {
-      toast.error("Please select a file first");
+    if (!markdown.trim()) {
+      toast.error(
+        inputMode === "file"
+          ? "Please select a file first"
+          : "Please paste markdown content"
+      );
+      return;
+    }
+
+    if (!title.trim()) {
+      toast.error("Please provide a title for your document");
       return;
     }
 
@@ -53,7 +85,7 @@ export function ConversionForm({
     try {
       const result = await convertToEpub({
         markdown,
-        filename: file.name,
+        filename: file?.name || `${title.replace(/\s+/g, "-").toLowerCase()}.md`,
         title: title || undefined,
         author: author || undefined,
       });
@@ -83,8 +115,17 @@ export function ConversionForm({
   };
 
   const handleSendToKindle = async () => {
-    if (!file || !markdown) {
-      toast.error("Please select a file first");
+    if (!markdown.trim()) {
+      toast.error(
+        inputMode === "file"
+          ? "Please select a file first"
+          : "Please paste markdown content"
+      );
+      return;
+    }
+
+    if (!title.trim()) {
+      toast.error("Please provide a title for your document");
       return;
     }
 
@@ -92,7 +133,7 @@ export function ConversionForm({
     try {
       const result = await convertAndSend({
         markdown,
-        filename: file.name,
+        filename: file?.name || `${title.replace(/\s+/g, "-").toLowerCase()}.md`,
         title: title || undefined,
         author: author || undefined,
       });
@@ -117,17 +158,41 @@ export function ConversionForm({
         <CardTitle>Convert Markdown to EPUB</CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
-        <FileUpload
-          onFileSelect={handleFileSelect}
-          selectedFile={file}
-          disabled={isLoading}
-        />
+        <Tabs
+          defaultValue="file"
+          onValueChange={(v) => setInputMode(v as "file" | "paste")}
+        >
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="file">Upload File</TabsTrigger>
+            <TabsTrigger value="paste">Paste Text</TabsTrigger>
+          </TabsList>
 
-        {file && (
+          <TabsContent value="file" className="mt-6">
+            <FileUpload
+              onFileSelect={handleFileSelect}
+              selectedFile={file}
+              disabled={isLoading}
+            />
+          </TabsContent>
+
+          <TabsContent value="paste" className="mt-6">
+            <Textarea
+              placeholder="Paste your markdown here..."
+              value={inputMode === "paste" ? markdown : ""}
+              onChange={(e) => handlePasteChange(e.target.value)}
+              className="min-h-[300px] font-mono text-sm"
+              disabled={isLoading}
+            />
+          </TabsContent>
+        </Tabs>
+
+        {markdown && (
           <>
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="title">Title</Label>
+                <Label htmlFor="title">
+                  Title {inputMode === "paste" && "*"}
+                </Label>
                 <Input
                   id="title"
                   value={title}

@@ -31,3 +31,12 @@ export function extractTitleFromFilename(filename: string): string {
     .replace(/[-_]/g, " ")
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
+
+export function extractTitleFromMarkdown(markdown: string): string | null {
+  // Match first H1 heading: # Title
+  const h1Match = markdown.match(/^#\s+(.+)$/m);
+  if (h1Match && h1Match[1]) {
+    return h1Match[1].trim();
+  }
+  return null;
+}
