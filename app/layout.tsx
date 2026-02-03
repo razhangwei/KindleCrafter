@@ -36,26 +36,26 @@ export default async function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen bg-background`}
       >
         <header className="border-b">
-          <nav className="container mx-auto max-w-2xl px-4 py-4 flex items-center justify-between">
-            <Link href="/" className="text-xl font-bold">
+          <nav className="container mx-auto max-w-2xl px-3 py-3 sm:px-4 sm:py-4 flex items-center justify-between">
+            <Link href="/" className="text-lg sm:text-xl font-bold">
               KindleCrafter
             </Link>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 sm:gap-3 md:gap-4">
               <Link
                 href="/"
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                className="text-xs sm:text-sm text-muted-foreground hover:text-foreground transition-colors"
               >
                 Markdown
               </Link>
               <Link
                 href="/podcast"
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                className="text-xs sm:text-sm text-muted-foreground hover:text-foreground transition-colors"
               >
                 Podcast
               </Link>
               <Link
                 href="/settings"
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                className="text-xs sm:text-sm text-muted-foreground hover:text-foreground transition-colors"
               >
                 Settings
               </Link>
