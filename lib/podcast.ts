@@ -294,6 +294,28 @@ export function parseYoutubeUrl(url: string): { videoId: string } {
 }
 
 /**
+ * Parse YouTube cookies from environment variable
+ * Expected format: JSON array of cookie objects with name, value, domain
+ */
+function getYoutubeCookies(): ytdl.Cookie[] | undefined {
+  const cookiesEnv = process.env.YOUTUBE_COOKIES;
+  if (!cookiesEnv) {
+    return undefined;
+  }
+
+  try {
+    const cookies = JSON.parse(cookiesEnv);
+    if (Array.isArray(cookies)) {
+      return cookies as ytdl.Cookie[];
+    }
+  } catch (error) {
+    console.error("[getYoutubeCookies] Failed to parse YOUTUBE_COOKIES:", error);
+  }
+
+  return undefined;
+}
+
+/**
  * Extract audio URL and metadata from YouTube video
  */
 export async function extractYoutubeAudio(youtubeUrl: string): Promise<{
@@ -304,8 +326,62 @@ export async function extractYoutubeAudio(youtubeUrl: string): Promise<{
 
   console.log("[extractYoutubeAudio] Getting info for video:", videoId);
 
-  // Get video info using ytdl-core
-  const info = await ytdl.getInfo(videoId);
+  // Create agent with cookies if available (helps bypass bot detection)
+  const cookies = getYoutubeCookies();
+  const agent = cookies
+    ? ytdl.createAgent(cookies)
+    : ytdl.createAgent(undefined, { localAddress: undefined });
+
+  // Try to get video info with retries and better error handling
+  let info;
+  let lastError: Error | null = null;
+
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      console.log(`[extractYoutubeAudio] Attempt ${attempt}/3`);
+      info = await ytdl.getInfo(videoId, {
+        agent,
+        requestOptions: {
+          headers: {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+          },
+        },
+      });
+      break;
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      console.error(`[extractYoutubeAudio] Attempt ${attempt} failed:`, lastError.message);
+
+      if (attempt < 3) {
+        // Wait before retry with exponential backoff
+        await new Promise((resolve) => setTimeout(resolve, 1000 * attempt));
+      }
+    }
+  }
+
+  if (!info) {
+    // Provide user-friendly error messages
+    const errorMessage = lastError?.message || "Unknown error";
+
+    if (errorMessage.includes("Sign in") || errorMessage.includes("bot")) {
+      throw new Error(
+        "YouTube is blocking automated access. This video may require authentication. " +
+        "Try a different video or contact the administrator to configure YouTube cookies."
+      );
+    }
+
+    if (errorMessage.includes("unavailable") || errorMessage.includes("private")) {
+      throw new Error("This video is unavailable or private.");
+    }
+
+    if (errorMessage.includes("age")) {
+      throw new Error("This video is age-restricted and cannot be accessed.");
+    }
+
+    throw new Error(`Failed to fetch YouTube video: ${errorMessage}`);
+  }
 
   const title = info.videoDetails.title;
   const channelName = info.videoDetails.author.name;

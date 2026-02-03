@@ -110,11 +110,12 @@ GMAIL_USER          # Gmail address
 GMAIL_APP_PASSWORD  # Gmail app-specific password
 ```
 
-### Podcast Transcription (optional - enables podcast feature)
+### Podcast/Video Transcription (optional - enables podcast feature)
 ```env
 GEMINI_API_KEY      # Google AI Studio API key
 INNGEST_EVENT_KEY   # Inngest event key
 INNGEST_SIGNING_KEY # Inngest signing key
+YOUTUBE_COOKIES     # (Optional) JSON array of YouTube cookies to bypass bot detection
 ```
 
 ### Security (optional)
@@ -149,6 +150,8 @@ SESSION_SECRET      # Secret for session tokens (required if APP_PASSWORD is set
 - **Duration Limit**: 60 minutes max (enforced in `app/actions/podcast.ts`)
 - **Apple Podcasts**: Uses iTunes API + RSS feed parsing (max 200 recent episodes)
 - **YouTube**: Uses @distube/ytdl-core for audio extraction
+  - May require `YOUTUBE_COOKIES` env var if bot detection blocks requests
+  - Export cookies from browser extension as JSON array format
 - **Processing Time**: ~2-4 minutes for typical 30-45 minute content
 - **Gemini Model**: gemini-2.5-flash (supports audio input up to ~1 hour)
 
