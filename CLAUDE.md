@@ -74,10 +74,12 @@ Apple Podcast URL → [PodcastForm] → submitPodcastJob (Server Action)
 
 ### Key Directories
 
-- `app/actions/` - Server Actions for conversion (`convert.ts`), podcast (`podcast.ts`), and settings (`settings.ts`)
+- `app/actions/` - Server Actions for conversion (`convert.ts`), podcast (`podcast.ts`), magazines (`magazines.ts`), and settings (`settings.ts`)
 - `app/podcast/` - Podcast transcription UI
-- `lib/` - Core utilities: `markdown.ts` (parsing), `epub.ts` (generation), `email.ts` (delivery), `podcast.ts` (Apple Podcasts → Audio + Gemini transcription)
+- `app/magazines/` - Magazine subscription UI
+- `lib/` - Core utilities: `markdown.ts` (parsing), `epub.ts` (generation), `email.ts` (delivery), `podcast.ts` (Apple Podcasts → Audio + Gemini transcription), `modal.ts` (Modal.com client for Calibre)
 - `inngest/` - Background job functions (`functions.ts`)
+- `modal_calibre/` - Modal.com Python container for Calibre recipe execution
 - `db/` - Drizzle ORM schema and connection
 - `components/ui/` - shadcn/ui components
 
@@ -122,6 +124,12 @@ APP_PASSWORD        # Password protection for personal use
 SESSION_SECRET      # Secret for session tokens (required if APP_PASSWORD is set)
 ```
 
+### Magazine Subscriptions (optional - enables magazine feature)
+```env
+MODAL_ENDPOINT_URL    # Modal.com endpoint URL (e.g., https://user--kindlecrafter-calibre-convert-recipe.modal.run)
+MODAL_WEBHOOK_SECRET  # Webhook secret for Modal authentication
+```
+
 ## Podcast Feature Architecture
 
 ### Processing Pipeline
@@ -160,6 +168,65 @@ The custom Gemini prompt (in `lib/podcast.ts`) produces Kindle-optimized output:
 - Inngest provides 2 automatic retries with exponential backoff
 - Graceful failures return user-friendly error messages
 - Duration validation prevents wasting API credits on unsupported long episodes
+
+## Magazine Feature Architecture
+
+### Data Flow
+
+```
+User uploads .recipe file → Store in DB (recipes table)
+                                    ↓
+                           Schedule stored (recipe_schedules table)
+                                    ↓
+                    ┌───────────────┴───────────────┐
+                    ↓                               ↓
+           Hourly Scheduler                  "Run Now" button
+           (magazineSchedulerJob)            (runRecipeNow action)
+                    ↓                               ↓
+                    └───────────────┬───────────────┘
+                                    ↓
+                          Queue magazine/recipe.run event
+                                    ↓
+                          Inngest Background Job
+                          (runMagazineRecipeJob)
+                                    ↓
+                          Modal.com Container
+                          - Calibre + xvfb
+                          - ebook-convert recipe.recipe output.epub
+                                    ↓
+                          Return EPUB as base64
+                                    ↓
+                          sendToKindle (existing email flow)
+```
+
+### Database Schema
+
+- **recipes**: Store recipe metadata and base64-encoded .recipe file content
+- **recipe_schedules**: Cron expression, timezone, last/next run timestamps, run status
+
+### Modal.com Container
+
+The `modal_calibre/app.py` Python container:
+- Debian-based image with Calibre installed
+- Uses `QT_QPA_PLATFORM=offscreen` for headless Qt (no xvfb needed)
+- 10-minute timeout, 2GB RAM for complex recipes
+- Receives recipe content (base64) and returns EPUB (base64)
+- Most recipes use Python's `mechanize` (default) which has no display dependencies
+
+### Deployment
+
+```bash
+# Deploy Modal container
+cd modal_calibre
+modal secret create kindlecrafter-webhook-secret WEBHOOK_SECRET=<your-secret>
+modal deploy app.py
+```
+
+### Recipe Sources
+
+Calibre recipes are Python scripts that define how to fetch and format content:
+- [Official Calibre recipes](https://github.com/kovidgoyal/calibre/tree/master/recipes)
+- Support for paywalled content requires credentials (deferred feature)
 
 ## Vercel Deployment
 
