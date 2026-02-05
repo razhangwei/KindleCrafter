@@ -12,28 +12,53 @@ interface RecipeListProps {
   configComplete: boolean;
 }
 
-function formatNextRun(date: Date | null): string {
-  if (!date) return "Not scheduled";
+// Days of the week for display
+const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-  const now = new Date();
-  const diffMs = date.getTime() - now.getTime();
-
-  if (diffMs < 0) return "Due now";
-
-  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-  const diffDays = Math.floor(diffHours / 24);
-
-  if (diffDays > 0) {
-    return `in ${diffDays} day${diffDays > 1 ? "s" : ""}`;
-  }
-  if (diffHours > 0) {
-    return `in ${diffHours} hour${diffHours > 1 ? "s" : ""}`;
-  }
-
-  const diffMins = Math.floor(diffMs / (1000 * 60));
-  return `in ${diffMins} minute${diffMins !== 1 ? "s" : ""}`;
+// Format hour for display (e.g., "6 AM", "6 PM")
+function formatHour(hour: number): string {
+  if (hour === 0) return "12 AM";
+  if (hour === 12) return "12 PM";
+  if (hour < 12) return `${hour} AM`;
+  return `${hour - 12} PM`;
 }
 
+// Parse cron expression and format as human-readable schedule
+function formatSchedule(cronExpression: string | undefined, timezone: string | undefined): string {
+  if (!cronExpression) return "No schedule";
+
+  const parts = cronExpression.split(" ");
+  // Format: minute hour day-of-month month day-of-week
+  const hour = parseInt(parts[1], 10) || 0;
+  const dayPart = parts[4];
+
+  const timeStr = formatHour(hour);
+  const tzShort = timezone ? `(${timezone.split("/").pop()?.replace("_", " ")})` : "";
+
+  // Parse days
+  let daysStr: string;
+  if (dayPart === "*") {
+    daysStr = "Daily";
+  } else if (dayPart === "1-5") {
+    daysStr = "Weekdays";
+  } else if (dayPart === "0,6" || dayPart === "6,0") {
+    daysStr = "Weekends";
+  } else {
+    // Parse comma-separated list
+    const days = dayPart.split(",").map((d) => parseInt(d, 10)).filter((d) => !isNaN(d));
+    if (days.length === 7) {
+      daysStr = "Daily";
+    } else if (days.length === 1) {
+      daysStr = `${DAYS[days[0]]}s`; // e.g., "Sundays"
+    } else {
+      daysStr = days.map((d) => DAYS[d]).join(", ");
+    }
+  }
+
+  return `${daysStr} at ${timeStr} ${tzShort}`.trim();
+}
+
+// Format last run time as relative time
 function formatLastRun(date: Date | null, status: string | null): string {
   if (!date) return "Never run";
 
@@ -44,16 +69,16 @@ function formatLastRun(date: Date | null, status: string | null): string {
 
   let timeAgo: string;
   if (diffDays > 0) {
-    timeAgo = `${diffDays} day${diffDays > 1 ? "s" : ""} ago`;
+    timeAgo = `${diffDays}d ago`;
   } else if (diffHours > 0) {
-    timeAgo = `${diffHours} hour${diffHours > 1 ? "s" : ""} ago`;
+    timeAgo = `${diffHours}h ago`;
   } else {
     const diffMins = Math.floor(diffMs / (1000 * 60));
-    timeAgo = `${diffMins} minute${diffMins !== 1 ? "s" : ""} ago`;
+    timeAgo = diffMins < 1 ? "just now" : `${diffMins}m ago`;
   }
 
-  const statusEmoji = status === "success" ? "✓" : status === "failed" ? "✗" : "";
-  return `${statusEmoji} ${timeAgo}`;
+  const statusIcon = status === "success" ? "✓" : status === "failed" ? "✗" : "";
+  return `${statusIcon} ${timeAgo}`.trim();
 }
 
 export function RecipeList({ recipes, configComplete }: RecipeListProps) {
@@ -148,9 +173,9 @@ export function RecipeList({ recipes, configComplete }: RecipeListProps) {
                 <CardDescription className="mt-1">
                   {recipe.enabled ? (
                     <>
-                      Next run: {formatNextRun(schedule?.nextRunAt ?? null)}
+                      {formatSchedule(schedule?.cronExpression, schedule?.timezone)}
                       {schedule?.lastRunAt && (
-                        <> • Last: {formatLastRun(schedule.lastRunAt, schedule.lastRunStatus)}</>
+                        <> · Last: {formatLastRun(schedule.lastRunAt, schedule.lastRunStatus)}</>
                       )}
                     </>
                   ) : (
