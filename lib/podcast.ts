@@ -1,5 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
-import { YoutubeTranscript } from "youtube-transcript";
+import { YoutubeTranscript } from "youtube-transcript-plus";
 
 export type ExtractionResult =
   | { source: "apple"; audioUrl: string; metadata: PodcastMetadata }
