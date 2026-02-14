@@ -1,7 +1,7 @@
 "use server";
 
 import { inngest } from "@/lib/inngest";
-import { parseApplePodcastUrl, extractPodcastAudio, isGeminiConfigured } from "@/lib/podcast";
+import { parseApplePodcastUrl, detectSourceType, parseYoutubeUrl, extractSource, isGeminiConfigured } from "@/lib/podcast";
 import { isEmailConfigured } from "@/lib/email";
 import { getSettings } from "./settings";
 
@@ -13,11 +13,16 @@ interface SubmitResult {
 }
 
 /**
- * Validate Apple Podcast URL format
+ * Validate podcast/video URL format (Apple Podcasts or YouTube)
  */
-function validatePodcastUrl(url: string): { valid: boolean; error?: string } {
+function validateUrl(url: string): { valid: boolean; error?: string } {
   try {
-    parseApplePodcastUrl(url);
+    const source = detectSourceType(url);
+    if (source === "apple") {
+      parseApplePodcastUrl(url);
+    } else {
+      parseYoutubeUrl(url);
+    }
     return { valid: true };
   } catch (error) {
     return {
@@ -57,21 +62,20 @@ export async function submitPodcastJob(url: string): Promise<SubmitResult> {
   }
 
   // Validate URL format
-  const urlValidation = validatePodcastUrl(url);
+  const urlValidation = validateUrl(url);
   if (!urlValidation.valid) {
     return {
       success: false,
-      message: urlValidation.error || "Invalid Apple Podcast URL",
+      message: urlValidation.error || "Invalid URL",
     };
   }
 
-  // Optionally check episode duration before queueing
-  // (This adds latency but prevents wasting resources on long episodes)
+  // Pre-flight: extract source to validate captions/metadata and check duration
   try {
-    const { metadata } = await extractPodcastAudio(url);
+    const result = await extractSource(url);
 
-    if (metadata.durationSeconds && metadata.durationSeconds > MAX_DURATION_SECONDS) {
-      const minutes = Math.round(metadata.durationSeconds / 60);
+    if (result.metadata.durationSeconds && result.metadata.durationSeconds > MAX_DURATION_SECONDS) {
+      const minutes = Math.round(result.metadata.durationSeconds / 60);
       return {
         success: false,
         message: `Episode is too long (${minutes} minutes). Maximum supported duration is 60 minutes.`,
@@ -80,7 +84,7 @@ export async function submitPodcastJob(url: string): Promise<SubmitResult> {
   } catch (error) {
     return {
       success: false,
-      message: `Failed to fetch podcast: ${error instanceof Error ? error.message : "Unknown error"}`,
+      message: `Failed to fetch source: ${error instanceof Error ? error.message : "Unknown error"}`,
     };
   }
 

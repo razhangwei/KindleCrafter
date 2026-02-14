@@ -1,5 +1,5 @@
 import { inngest } from "@/lib/inngest";
-import { extractPodcastAudio, transcribePodcast } from "@/lib/podcast";
+import { extractSource, transcribePodcast, reformatCaptions } from "@/lib/podcast";
 import { parseMarkdown, removeFirstH1IfMatchesTitle } from "@/lib/markdown";
 import { generateEpub } from "@/lib/epub";
 import { sendToKindle } from "@/lib/email";
@@ -21,17 +21,24 @@ export const transcribePodcastJob = inngest.createFunction(
   async ({ event, step }) => {
     const { podcastUrl, kindleEmail } = event.data as TranscribePodcastEvent["data"];
 
-    // Step 1: Extract audio URL from Apple Podcast
-    const { audioUrl, metadata } = await step.run("extract-audio", async () => {
-      console.log("[transcribePodcastJob] Extracting audio from:", podcastUrl);
-      return extractPodcastAudio(podcastUrl);
+    // Step 1: Extract source (audio URL for Apple, captions for YouTube)
+    const extractionResult = await step.run("extract-source", async () => {
+      console.log("[transcribePodcastJob] Extracting source from:", podcastUrl);
+      return extractSource(podcastUrl);
     });
 
-    // Step 2: Transcribe with Gemini
+    // Step 2: Transcribe/reformat based on source type
     const markdown = await step.run("transcribe", async () => {
-      console.log("[transcribePodcastJob] Transcribing:", metadata.title);
-      return transcribePodcast(audioUrl, metadata);
+      if (extractionResult.source === "youtube") {
+        console.log("[transcribePodcastJob] Reformatting YouTube captions:", extractionResult.metadata.title);
+        return reformatCaptions(extractionResult.captionText, extractionResult.metadata);
+      } else {
+        console.log("[transcribePodcastJob] Transcribing audio:", extractionResult.metadata.title);
+        return transcribePodcast(extractionResult.audioUrl, extractionResult.metadata);
+      }
     });
+
+    const metadata = extractionResult.metadata;
 
     // Step 3: Convert to EPUB
     const epubBase64 = await step.run("generate-epub", async () => {

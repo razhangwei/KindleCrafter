@@ -58,25 +58,24 @@ Apple Podcast URL → [PodcastForm] → submitPodcastJob (Server Action)
                                             ↓
                     ┌───────────────────────┴───────────────────────┐
                     ↓                                               ↓
-        Step 1-2: extractPodcastAudio                  Inngest Background Job
-        - iTunes API → RSS feed                        (inngest/functions.ts)
-        - Parse RSS → Audio URL                        - 5 steps
-                    ↓                                   - 2 retries
-        Step 3: transcribePodcast
-        - Download audio
-        - Gemini 2.5 Flash transcription
-        - Format as Markdown
+        Step 1: extractSource                            Inngest Background Job
+        - Apple: iTunes API → RSS → Audio URL             (inngest/functions.ts)
+        - YouTube: oEmbed + youtube-transcript captions    - 4 steps
+                    ↓                                      - 2 retries
+        Step 2: transcribe/reformat
+        - Apple: Download audio → Gemini audio-to-text
+        - YouTube: Gemini text-to-text caption reformat
                     ↓
-        Step 4: parseMarkdown → HTML
+        Step 3: parseMarkdown → generateEpub
                     ↓
-        Step 5: generateEpub → sendToKindle
+        Step 4: sendToKindle
 ```
 
 ### Key Directories
 
 - `app/actions/` - Server Actions for conversion (`convert.ts`), podcast (`podcast.ts`), and settings (`settings.ts`)
 - `app/podcast/` - Podcast transcription UI
-- `lib/` - Core utilities: `markdown.ts` (parsing), `epub.ts` (generation), `email.ts` (delivery), `podcast.ts` (Apple Podcasts → Audio + Gemini transcription)
+- `lib/` - Core utilities: `markdown.ts` (parsing), `epub.ts` (generation), `email.ts` (delivery), `podcast.ts` (Apple Podcasts audio + YouTube captions → Gemini transcription/reformatting)
 - `inngest/` - Background job functions (`functions.ts`)
 - `db/` - Drizzle ORM schema and connection
 - `components/ui/` - shadcn/ui components
@@ -126,32 +125,30 @@ SESSION_SECRET      # Secret for session tokens (required if APP_PASSWORD is set
 
 ### Processing Pipeline
 
-1. **URL Submission**: User provides Apple Podcasts episode URL
+1. **URL Submission**: User provides Apple Podcasts episode URL or YouTube video URL
 2. **Pre-flight Validation**: Check Kindle email, email service, and Gemini API configuration
-3. **Duration Check**: Pre-fetch metadata from iTunes API, reject episodes >60 minutes
+3. **Source Extraction & Duration Check**: Extract source data (audio URL or captions + metadata), reject >60 minutes
 4. **Job Queueing**: Send `podcast/transcribe.requested` event to Inngest
-5. **Background Processing** (5 steps with 2 retries):
-   - Extract audio URL from iTunes API + RSS feed
-   - Download audio file (streams large files >20MB to Gemini Files API)
-   - Transcribe with Gemini 2.5 Flash using custom Kindle-optimized prompt
-   - Convert transcript Markdown → EPUB
+5. **Background Processing** (4 steps with 2 retries):
+   - Extract source via `extractSource()` (Apple: iTunes API + RSS → audio URL; YouTube: oEmbed + youtube-transcript → captions)
+   - Transcribe/reformat (Apple: download audio → Gemini audio-to-text; YouTube: Gemini text-to-text caption reformatting)
+   - Convert Markdown → EPUB
    - Email to configured Kindle address
 
 ### Technical Constraints
 
 - **Duration Limit**: 60 minutes max (enforced in `app/actions/podcast.ts`)
-- **Apple Podcasts Only**: Uses iTunes API + RSS feed parsing
-- **Recent Episodes**: iTunes API returns max 200 episodes
-- **Processing Time**: ~2-4 minutes for typical 30-45 minute episodes
-- **Gemini Model**: gemini-2.5-flash (supports audio input up to ~1 hour)
+- **Supported Sources**: Apple Podcasts (iTunes API + RSS feed) and YouTube (caption-based, no audio download)
+- **YouTube Captions**: Requires auto-generated or manual captions; videos with captions disabled will error immediately
+- **Recent Episodes**: iTunes API returns max 200 episodes (Apple Podcasts only)
+- **Gemini Model**: gemini-2.5-flash (audio transcription for Apple, text reformatting for YouTube)
 
-### Transcription Prompt Features
+### Transcription/Reformatting Prompts
 
-The custom Gemini prompt (in `lib/podcast.ts`) produces Kindle-optimized output:
-- Detects topic changes and inserts chapter headings (## Markdown)
-- Identifies speakers by name (or uses Host/Guest labels)
-- Removes filler words, false starts, ads, and sponsor reads
-- Formats as clean, magazine-style Markdown (not verbatim transcript)
+The custom Gemini prompts (in `lib/podcast.ts`) produce Kindle-optimized output:
+- **Audio transcription** (Apple Podcasts): Transcribes audio directly with speaker detection, chapter headings, filler removal
+- **Caption reformatting** (YouTube): Cleans up raw auto-generated captions — adds punctuation, fixes errors, structures into chapters
+- Both produce the same output format: clean, magazine-style Markdown with ## sections and **Speaker:** labels
 - No timestamps or [inaudible] markers
 
 ### Error Handling
