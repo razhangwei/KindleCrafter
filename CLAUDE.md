@@ -127,7 +127,7 @@ SESSION_SECRET      # Secret for session tokens (required if APP_PASSWORD is set
 
 1. **URL Submission**: User provides Apple Podcasts episode URL or YouTube video URL
 2. **Pre-flight Validation**: Check Kindle email, email service, and Gemini API configuration
-3. **Source Extraction & Duration Check**: Extract source data (audio URL or captions + metadata), reject >60 minutes
+3. **Source Extraction**: Extract source data (audio URL or captions + metadata), validate accessibility
 4. **Job Queueing**: Send `podcast/transcribe.requested` event to Inngest
 5. **Background Processing** (4 steps with 2 retries):
    - Extract source via `extractSource()` (Apple: iTunes API + RSS → audio URL; YouTube: oEmbed + youtube-transcript → captions)
@@ -137,7 +137,6 @@ SESSION_SECRET      # Secret for session tokens (required if APP_PASSWORD is set
 
 ### Technical Constraints
 
-- **Duration Limit**: 60 minutes max (enforced in `app/actions/podcast.ts`)
 - **Supported Sources**: Apple Podcasts (iTunes API + RSS feed) and YouTube (caption-based, no audio download)
 - **YouTube Captions**: Requires auto-generated or manual captions; videos with captions disabled will error immediately
 - **Recent Episodes**: iTunes API returns max 200 episodes (Apple Podcasts only)
@@ -156,7 +155,6 @@ The custom Gemini prompts (in `lib/podcast.ts`) produce Kindle-optimized output:
 - Pre-flight checks validate all required services before queueing
 - Inngest provides 2 automatic retries with exponential backoff
 - Graceful failures return user-friendly error messages
-- Duration validation prevents wasting API credits on unsupported long episodes
 
 ## Vercel Deployment
 

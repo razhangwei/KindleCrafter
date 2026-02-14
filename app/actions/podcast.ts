@@ -5,8 +5,6 @@ import { parseApplePodcastUrl, detectSourceType, parseYoutubeUrl, extractSource,
 import { isEmailConfigured } from "@/lib/email";
 import { getSettings } from "./settings";
 
-const MAX_DURATION_SECONDS = 3600; // 1 hour limit
-
 interface SubmitResult {
   success: boolean;
   message: string;
@@ -70,17 +68,9 @@ export async function submitPodcastJob(url: string): Promise<SubmitResult> {
     };
   }
 
-  // Pre-flight: extract source to validate captions/metadata and check duration
+  // Pre-flight: extract source to validate captions/metadata
   try {
-    const result = await extractSource(url);
-
-    if (result.metadata.durationSeconds && result.metadata.durationSeconds > MAX_DURATION_SECONDS) {
-      const minutes = Math.round(result.metadata.durationSeconds / 60);
-      return {
-        success: false,
-        message: `Episode is too long (${minutes} minutes). Maximum supported duration is 60 minutes.`,
-      };
-    }
+    await extractSource(url);
   } catch (error) {
     return {
       success: false,

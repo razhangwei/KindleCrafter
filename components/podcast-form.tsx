@@ -84,7 +84,7 @@ export function PodcastForm({
             disabled={isLoading}
           />
           <p className="text-sm text-muted-foreground">
-            Apple Podcasts and YouTube videos up to 1 hour are supported. YouTube uses captions (auto-generated or manual).
+            Apple Podcasts and YouTube videos are supported. YouTube uses captions (auto-generated or manual).
           </p>
         </div>
 
