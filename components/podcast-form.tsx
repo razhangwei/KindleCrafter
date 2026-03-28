@@ -23,9 +23,10 @@ export function PodcastForm({
   const [isLoading, setIsLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
-  const validateApplePodcastUrl = (url: string): boolean => {
-    const pattern = /^https:\/\/podcasts\.apple\.com\/.+\/id\d+.*[?&]i=\d+/;
-    return pattern.test(url);
+  const validateUrl = (url: string): boolean => {
+    const applePattern = /^https:\/\/podcasts\.apple\.com\/.+\/id\d+.*[?&]i=\d+/;
+    const youtubePattern = /^https?:\/\/(?:www\.)?(?:youtube\.com\/watch\?.*v=|youtu\.be\/|youtube\.com\/shorts\/)[a-zA-Z0-9_-]{11}/;
+    return applePattern.test(url) || youtubePattern.test(url);
   };
 
   const handleSubmit = async () => {
@@ -34,8 +35,8 @@ export function PodcastForm({
       return;
     }
 
-    if (!validateApplePodcastUrl(url)) {
-      toast.error("Please enter a valid Apple Podcast episode URL");
+    if (!validateUrl(url)) {
+      toast.error("Please enter a valid Apple Podcast or YouTube URL");
       return;
     }
 
@@ -63,14 +64,14 @@ export function PodcastForm({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Transcribe Podcast Episode</CardTitle>
+        <CardTitle>Transcribe Podcast or Video</CardTitle>
         <CardDescription>
-          Paste an Apple Podcast episode URL to transcribe and send to your Kindle.
+          Paste an Apple Podcast episode URL or YouTube video URL to transcribe and send to your Kindle.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         <div className="space-y-2">
-          <Label htmlFor="podcast-url">Apple Podcast Episode URL</Label>
+          <Label htmlFor="podcast-url">Podcast or YouTube URL</Label>
           <Input
             id="podcast-url"
             type="url"
@@ -79,18 +80,18 @@ export function PodcastForm({
               setUrl(e.target.value);
               setSubmitted(false);
             }}
-            placeholder="https://podcasts.apple.com/.../id123456789?i=1000123456789"
+            placeholder="https://podcasts.apple.com/... or https://youtube.com/watch?v=..."
             disabled={isLoading}
           />
           <p className="text-sm text-muted-foreground">
-            Episodes up to 1 hour are supported. Processing takes 2-4 minutes.
+            Apple Podcasts and YouTube videos are supported. YouTube uses captions (auto-generated or manual).
           </p>
         </div>
 
         {submitted && (
           <div className="rounded-lg border border-green-200 bg-green-50 p-4 dark:border-green-900 dark:bg-green-950">
             <p className="text-sm text-green-800 dark:text-green-200">
-              Your podcast is being transcribed! Check your Kindle in a few minutes.
+              Your content is being processed! Check your Kindle in a few minutes.
             </p>
           </div>
         )}

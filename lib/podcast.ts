@@ -1,4 +1,9 @@
 import { GoogleGenAI } from "@google/genai";
+import { YoutubeTranscript } from "youtube-transcript-plus";
+
+export type ExtractionResult =
+  | { source: "apple"; audioUrl: string; metadata: PodcastMetadata }
+  | { source: "youtube"; captionText: string; metadata: PodcastMetadata };
 
 export interface PodcastMetadata {
   title: string;
@@ -220,6 +225,198 @@ export async function extractPodcastAudio(appleUrl: string): Promise<{
       description: episode.description,
     },
   };
+}
+
+/**
+ * Extract video ID from YouTube URL
+ * Supports youtube.com/watch?v=, youtu.be/, youtube.com/shorts/, etc.
+ */
+export function parseYoutubeUrl(url: string): string {
+  const patterns = [
+    /(?:youtube\.com\/watch\?.*v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})/,
+  ];
+
+  for (const pattern of patterns) {
+    const match = url.match(pattern);
+    if (match) return match[1];
+  }
+
+  throw new Error(
+    "Invalid YouTube URL. Expected format: https://www.youtube.com/watch?v=... or https://youtu.be/..."
+  );
+}
+
+/**
+ * Detect whether URL is Apple Podcasts or YouTube
+ */
+export function detectSourceType(url: string): "apple" | "youtube" {
+  if (/podcasts\.apple\.com/.test(url)) return "apple";
+  if (/(?:youtube\.com|youtu\.be)/.test(url)) return "youtube";
+  throw new Error("Unsupported URL. Please provide an Apple Podcasts or YouTube link.");
+}
+
+/**
+ * Fetch video metadata from YouTube oEmbed API (no API key needed)
+ */
+async function fetchYoutubeMetadata(videoId: string): Promise<PodcastMetadata> {
+  const oembedUrl = `https://www.youtube.com/oembed?url=${encodeURIComponent(`https://www.youtube.com/watch?v=${videoId}`)}&format=json`;
+
+  const response = await fetch(oembedUrl);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch YouTube video metadata: ${response.status}`);
+  }
+
+  const data = await response.json();
+
+  return {
+    title: data.title || "Untitled Video",
+    podcastName: data.author_name || "Unknown Channel",
+  };
+}
+
+/**
+ * Fetch captions from YouTube using youtube-transcript
+ * Returns raw caption text and estimated duration
+ */
+async function fetchYoutubeCaptions(videoId: string): Promise<{ captionText: string; durationSeconds: number }> {
+  let transcript;
+  try {
+    transcript = await YoutubeTranscript.fetchTranscript(videoId);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.includes("disabled") || message.includes("Transcript is disabled")) {
+      throw new Error("Captions are disabled for this video. Only videos with captions (auto-generated or manual) are supported.");
+    }
+    throw new Error(`Failed to fetch YouTube captions: ${message}`);
+  }
+
+  if (!transcript || transcript.length === 0) {
+    throw new Error("No captions available for this video. Only videos with captions (auto-generated or manual) are supported.");
+  }
+
+  const captionText = transcript.map((entry) => entry.text).join(" ");
+
+  // Estimate duration from last caption entry
+  const lastEntry = transcript[transcript.length - 1];
+  const durationSeconds = Math.ceil(lastEntry.offset / 1000 + (lastEntry.duration ?? 0) / 1000);
+
+  return { captionText, durationSeconds };
+}
+
+/**
+ * Extract source data (audio URL or captions) and metadata from any supported URL
+ */
+export async function extractSource(url: string): Promise<ExtractionResult> {
+  const sourceType = detectSourceType(url);
+
+  if (sourceType === "apple") {
+    const { audioUrl, metadata } = await extractPodcastAudio(url);
+    return { source: "apple", audioUrl, metadata };
+  }
+
+  const videoId = parseYoutubeUrl(url);
+  console.log("[extractSource] Fetching YouTube video:", videoId);
+
+  const [metadata, { captionText, durationSeconds }] = await Promise.all([
+    fetchYoutubeMetadata(videoId),
+    fetchYoutubeCaptions(videoId),
+  ]);
+
+  metadata.durationSeconds = durationSeconds;
+
+  console.log("[extractSource] YouTube metadata:", metadata.title, "by", metadata.podcastName);
+  console.log("[extractSource] Caption length:", captionText.length, "chars, duration:", durationSeconds, "s");
+
+  return { source: "youtube", captionText, metadata };
+}
+
+/**
+ * Build Gemini prompt for reformatting raw YouTube captions into readable Markdown
+ */
+function buildCaptionReformattingPrompt(metadata: PodcastMetadata): string {
+  return `You are reformatting raw YouTube captions into a polished, readable document for a Kindle e-reader.
+
+VIDEO INFO:
+- Title: ${metadata.title}
+- Channel: ${metadata.podcastName}
+
+The input is raw auto-generated caption text — it has no punctuation, no paragraphs, and may contain errors. Your job is to transform it into a well-formatted Markdown document.
+
+FORMATTING REQUIREMENTS:
+
+1. **Format as Markdown** suitable for book reading:
+   - Start with a level 1 heading (# Video Title)
+   - Add a brief intro line with channel name
+
+2. **Chapter/Section Headings**:
+   - Detect topic changes and insert level 2 headings (##)
+   - Create meaningful section titles based on the content
+   - Aim for 3-8 sections depending on video length
+   - Example: "## The Early Days of the Company" or "## Advice for Entrepreneurs"
+
+3. **Speaker Identification**:
+   - Identify speakers when their names are mentioned
+   - Format speaker changes as **Speaker Name:** at the start of their speech
+   - If names aren't mentioned, use "Host:" and "Guest:" or "Speaker 1:", "Speaker 2:"
+   - Don't repeat the speaker label if the same person continues speaking
+
+4. **Clean Paragraphs**:
+   - Add proper punctuation and capitalization throughout
+   - Fix auto-caption errors (misheard words, incorrect homophones)
+   - Remove filler words: "um", "uh", "like" (as filler), "you know", "I mean"
+   - Remove false starts and repeated words
+   - Break into logical paragraphs (4-6 sentences each)
+
+5. **Do NOT include**:
+   - Timestamps
+   - [Music] or [Applause] markers
+   - Ads or sponsor reads (skip these sections entirely)
+
+6. **Maintain Natural Reading Flow**:
+   - The output should read like a polished magazine interview or book chapter
+   - Preserve the speaker's meaning and personality while cleaning up the text
+
+OUTPUT: Provide ONLY the formatted Markdown document. Do not include any meta-commentary.`;
+}
+
+/**
+ * Reformat raw YouTube captions using Gemini text-to-text
+ */
+export async function reformatCaptions(
+  captionText: string,
+  metadata: PodcastMetadata
+): Promise<string> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error("GEMINI_API_KEY is not configured");
+  }
+
+  const genAI = new GoogleGenAI({ apiKey });
+  const prompt = buildCaptionReformattingPrompt(metadata);
+
+  console.log("[reformatCaptions] Sending captions to Gemini for reformatting...");
+
+  const result = await genAI.models.generateContent({
+    model: "gemini-2.5-flash",
+    contents: [
+      {
+        role: "user",
+        parts: [
+          { text: `${prompt}\n\n---\n\nRAW CAPTIONS:\n\n${captionText}` },
+        ],
+      },
+    ],
+  });
+
+  const formatted = result.text;
+
+  if (!formatted || formatted.length < 100) {
+    throw new Error("Caption reformatting returned empty or too short result");
+  }
+
+  console.log("[reformatCaptions] Reformatting complete, length:", formatted.length);
+
+  return formatted;
 }
 
 /**
