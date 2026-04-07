@@ -1,6 +1,6 @@
 "use server";
 
-import { parseMarkdown, extractTitleFromFilename, removeFirstH1IfMatchesTitle } from "@/lib/markdown";
+import { parseMarkdown, extractTitleFromFilename, removeFirstH1IfMatchesTitle, detectLanguage } from "@/lib/markdown";
 import { generateEpub } from "@/lib/epub";
 import { sendToKindle, isEmailConfigured } from "@/lib/email";
 import { getSettings } from "./settings";
@@ -38,9 +38,11 @@ export async function convertToEpub(input: ConvertInput): Promise<ConvertResult>
       throw new Error(`Markdown parsing failed: ${parseError instanceof Error ? parseError.message : "Unknown error"}`);
     }
 
+    const lang = detectLanguage(processedMarkdown);
+
     let epubBuffer: Buffer;
     try {
-      epubBuffer = await generateEpub({ title, author, html });
+      epubBuffer = await generateEpub({ title, author, html, lang });
       console.log("[convertToEpub] EPUB generated successfully, size:", epubBuffer.length);
     } catch (epubError) {
       console.error("[convertToEpub] EPUB generation failed:", epubError);
@@ -83,7 +85,8 @@ export async function convertAndSend(input: ConvertInput): Promise<ConvertResult
     const processedMarkdown = removeFirstH1IfMatchesTitle(input.markdown, title);
 
     const html = await parseMarkdown(processedMarkdown);
-    const epubBuffer = await generateEpub({ title, author, html });
+    const lang = detectLanguage(processedMarkdown);
+    const epubBuffer = await generateEpub({ title, author, html, lang });
 
     await sendToKindle({
       to: userSettings.kindleEmail,

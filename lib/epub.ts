@@ -4,16 +4,19 @@ interface EpubOptions {
   title: string;
   author: string;
   html: string;
+  lang?: string;
 }
 
 export async function generateEpub({
   title,
   author,
   html,
+  lang,
 }: EpubOptions): Promise<Buffer> {
   const options = {
     title,
     author,
+    lang: lang ?? "en",
     css: `
       body {
         font-family: serif;
