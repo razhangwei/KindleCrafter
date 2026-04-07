@@ -41,6 +41,15 @@ export function extractTitleFromMarkdown(markdown: string): string | null {
   return null;
 }
 
+export function detectLanguage(text: string): string {
+  const cjkCount = (text.match(/[\u4e00-\u9fff\u3400-\u4dbf]/g) || []).length;
+  const latinCount = (text.match(/[A-Za-z]/g) || []).length;
+  if (cjkCount > 0 && cjkCount > latinCount) {
+    return "zh";
+  }
+  return "en";
+}
+
 export function removeFirstH1IfMatchesTitle(markdown: string, title: string): string {
   // Match first H1 heading at the start of a line
   const h1Match = markdown.match(/^(#\s+(.+))$/m);

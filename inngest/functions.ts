@@ -1,6 +1,6 @@
 import { inngest } from "@/lib/inngest";
 import { extractPodcastAudio, transcribePodcast } from "@/lib/podcast";
-import { parseMarkdown, removeFirstH1IfMatchesTitle } from "@/lib/markdown";
+import { parseMarkdown, removeFirstH1IfMatchesTitle, detectLanguage } from "@/lib/markdown";
 import { generateEpub } from "@/lib/epub";
 import { sendToKindle } from "@/lib/email";
 
@@ -39,10 +39,12 @@ export const transcribePodcastJob = inngest.createFunction(
       // Remove first H1 if it matches the title to avoid duplication on Kindle
       const processedMarkdown = removeFirstH1IfMatchesTitle(markdown, metadata.title);
       const html = await parseMarkdown(processedMarkdown);
+      const lang = detectLanguage(processedMarkdown);
       const epubBuffer = await generateEpub({
         title: metadata.title,
         author: metadata.podcastName,
         html,
+        lang,
       });
       return epubBuffer.toString("base64");
     });
