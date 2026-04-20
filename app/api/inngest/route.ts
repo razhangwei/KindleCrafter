@@ -1,8 +1,12 @@
 import { serve } from "inngest/next";
 import { inngest } from "@/lib/inngest";
-import { transcribePodcastJob } from "@/inngest/functions";
+import {
+  transcribePodcastJob,
+  runMagazineRecipeJob,
+  magazineSchedulerJob,
+} from "@/inngest/functions";
 
 export const { GET, POST, PUT } = serve({
   client: inngest,
-  functions: [transcribePodcastJob],
+  functions: [transcribePodcastJob, runMagazineRecipeJob, magazineSchedulerJob],
 });

@@ -54,6 +54,12 @@ export default async function RootLayout({
                 Podcast
               </Link>
               <Link
+                href="/magazines"
+                className="text-xs sm:text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Magazines
+              </Link>
+              <Link
                 href="/settings"
                 className="text-xs sm:text-sm text-muted-foreground hover:text-foreground transition-colors"
               >
