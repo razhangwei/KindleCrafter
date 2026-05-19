@@ -28,7 +28,7 @@ Convert content to EPUB format and send it directly to your Kindle.
 ### Prerequisites
 
 - Node.js 18+
-- PostgreSQL database (Supabase recommended)
+- Vercel account (for Edge Config settings store — optional, only needed for UI-based Kindle email configuration)
 
 ### Installation
 
@@ -41,7 +41,10 @@ npm install
 Create a `.env.local` file:
 
 ```
-DATABASE_URL=postgresql://...
+# Settings store (Vercel Edge Config) - enables saving Kindle email via the UI
+EDGE_CONFIG=https://edge-config.vercel.com/ecfg_xxx?token=xxx
+EDGE_CONFIG_ID=ecfg_xxxxxxxxxxxx
+VERCEL_API_TOKEN=your-vercel-api-token
 
 # Email delivery (at least one required for Send to Kindle)
 RESEND_API_KEY=re_...
@@ -59,11 +62,12 @@ INNGEST_EVENT_KEY=...
 INNGEST_SIGNING_KEY=...
 ```
 
-### Database Setup
+### Edge Config Setup
 
-```bash
-npx drizzle-kit push
-```
+1. In the Vercel dashboard, go to **Storage > Edge Config** and create a new store.
+2. Link the store to your project — `EDGE_CONFIG` is auto-injected.
+3. Copy the store ID into `EDGE_CONFIG_ID` and create a Vercel API token for `VERCEL_API_TOKEN`.
+4. Seed the initial value: add an item with key `kindleEmail` and your Kindle address.
 
 ### Development
 
@@ -96,7 +100,7 @@ Open [http://localhost:3000](http://localhost:3000).
 ## Tech Stack
 
 - **Framework**: Next.js 15+ (App Router)
-- **Database**: Supabase (PostgreSQL) + Drizzle ORM
+- **Settings Store**: Vercel Edge Config
 - **Styling**: Tailwind CSS v4 + shadcn/ui
 - **Conversion**: marked + epub-gen-memory
 - **Email**: Resend / Gmail (nodemailer)
