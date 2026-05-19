@@ -26,10 +26,17 @@ export function SettingsForm({ initialEmail }: SettingsFormProps) {
 
     setIsLoading(true);
     try {
-      await updateSettings(email);
-      toast.success("Settings saved!");
-    } catch {
-      toast.error("Failed to save settings");
+      const result = await updateSettings(email);
+      if (result.success) {
+        toast.success("Settings saved!");
+      } else {
+        toast.error(result.error, { duration: 10000 });
+      }
+    } catch (err) {
+      toast.error(
+        `Failed to save settings: ${err instanceof Error ? err.message : String(err)}`,
+        { duration: 10000 }
+      );
     } finally {
       setIsLoading(false);
     }

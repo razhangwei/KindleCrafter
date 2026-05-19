@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - **Frontend:** Next.js 15+ (App Router)
 - **Backend:** Server Actions (collocated with frontend)
-- **Database:** Supabase (Postgres) + Drizzle ORM
+- **Settings store:** Vercel Edge Config (reads via `@vercel/edge-config`, writes via Vercel REST API)
 - **Styling:** Tailwind CSS v4 + shadcn/ui
 - **Deployment:** Vercel
 - **Language:** TypeScript (strict mode)
@@ -19,8 +19,6 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 npm run dev      # Start development server (port 3000)
 npm run build    # Build for production
 npm run lint     # Run ESLint
-npx drizzle-kit generate   # Generate database migrations
-npx drizzle-kit push       # Push schema changes to database
 ```
 
 ## Architecture
@@ -78,14 +76,13 @@ Apple Podcast URL → [PodcastForm] → submitPodcastJob (Server Action)
 - `app/podcast/` - Podcast transcription UI
 - `lib/` - Core utilities: `markdown.ts` (parsing), `epub.ts` (generation), `email.ts` (delivery), `podcast.ts` (Apple Podcasts → Audio + Gemini transcription)
 - `inngest/` - Background job functions (`functions.ts`)
-- `db/` - Drizzle ORM schema and connection
 - `components/ui/` - shadcn/ui components
 
 ### Patterns
 
 - **Server Actions**: All heavy processing (markdown parsing, EPUB generation, email) runs server-side
-- **Graceful Degradation**: App works without database or email configuration (download-only mode)
-- **Single-Record Settings**: Uses `limit(1)` pattern for user configuration
+- **Graceful Degradation**: App works without Edge Config or email configuration (download-only mode); `getSettings()` returns `null` when Edge Config is unavailable
+- **Single-Key Settings**: One Edge Config key (`kindleEmail`) holds all user configuration
 - **Email Priority**: Gmail is tried first (easier setup), then Resend as fallback
 - **Async Job Pattern**: Long-running tasks (podcast transcription) use Inngest for background processing with retries
 - **Pipeline Convergence**: Both input types converge at EPUB generation (parseMarkdown → generateEpub)
@@ -93,9 +90,12 @@ Apple Podcast URL → [PodcastForm] → submitPodcastJob (Server Action)
 
 ## Environment Variables
 
-### Required
+### Settings Store - Vercel Edge Config (optional - enables UI-based settings)
 ```env
-DATABASE_URL        # Supabase PostgreSQL connection string
+EDGE_CONFIG         # Read connection string (auto-injected when Edge Config is linked)
+EDGE_CONFIG_ID      # Edge Config store ID (required for writes)
+VERCEL_API_TOKEN    # Vercel API token with write scope (required for writes)
+VERCEL_TEAM_ID      # Optional, only if the project is under a Vercel team
 ```
 
 ### Email Delivery (at least one required for "Send to Kindle")
