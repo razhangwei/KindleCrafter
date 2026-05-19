@@ -17,13 +17,17 @@ export async function getSettings() {
   }
 }
 
-export async function updateSettings(kindleEmail: string) {
+type UpdateResult = { success: true } | { success: false; error: string };
+
+export async function updateSettings(kindleEmail: string): Promise<UpdateResult> {
   const { VERCEL_API_TOKEN, EDGE_CONFIG_ID, VERCEL_TEAM_ID } = process.env;
 
   if (!VERCEL_API_TOKEN || !EDGE_CONFIG_ID) {
-    throw new Error(
-      "Edge Config write credentials not set. Please configure VERCEL_API_TOKEN and EDGE_CONFIG_ID."
-    );
+    return {
+      success: false,
+      error:
+        "Edge Config write credentials missing. Set VERCEL_API_TOKEN and EDGE_CONFIG_ID in Vercel project env vars.",
+    };
   }
 
   const url = new URL(
@@ -31,22 +35,33 @@ export async function updateSettings(kindleEmail: string) {
   );
   if (VERCEL_TEAM_ID) url.searchParams.set("teamId", VERCEL_TEAM_ID);
 
-  const res = await fetch(url, {
-    method: "PATCH",
-    headers: {
-      Authorization: `Bearer ${VERCEL_API_TOKEN}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      items: [
-        { operation: "upsert", key: "kindleEmail", value: kindleEmail },
-      ],
-    }),
-  });
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${VERCEL_API_TOKEN}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        items: [
+          { operation: "upsert", key: "kindleEmail", value: kindleEmail },
+        ],
+      }),
+    });
+  } catch (err) {
+    return {
+      success: false,
+      error: `Network error calling Vercel API: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
 
   if (!res.ok) {
-    const detail = await res.text();
-    throw new Error(`Failed to update Edge Config (${res.status}): ${detail}`);
+    const detail = await res.text().catch(() => "");
+    return {
+      success: false,
+      error: `Vercel API ${res.status}: ${detail || res.statusText}`,
+    };
   }
 
   revalidatePath("/");
